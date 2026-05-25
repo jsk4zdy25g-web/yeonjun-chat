@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>연준</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+body { font-family: 'Noto Sans KR', sans-serif; }
+#app { max-width: 480px; margin: 0 auto; height: 100vh; display: flex; flex-direction: column; }
+#header { height: 50px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+#header .left { width: 40px; font-size: 20px; cursor: pointer; }
+#header .center { flex: 1; text-align: center; }
+#header .center h2 { font-size: 16px; margin-bottom: 2px; }
+#header .center span { font-size: 11px; opacity: 0.7; }
+#header .right { width: 80px; display: flex; justify-content: flex-end; gap: 15px; font-size: 20px; }
+#chat { flex: 1; overflow-y: auto; padding: 10px; -webkit-overflow-scrolling: touch; }
+.date-divider { text-align: center; margin: 15px 0; }
+.date-divider span { background: rgba(255,255,255,0.7); padding: 6px 14px; border-radius: 15px; font-size: 12px; }
+.msg { display: flex; margin-bottom: 8px; }
+.msg.sent { justify-content: flex-end; }
+.msg.received { justify-content: flex-start; }
+.msg-box { display: flex; align-items: flex-end; gap: 5px; max-width: 80%; }
+.msg.sent .msg-box { flex-direction: row-reverse; }
+.avatar { width: 36px; height: 36px; border-radius: 12px; overflow: hidden; background: #333; flex-shrink: 0; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.bubble { padding: 10px 14px; border-radius: 18px; font-size: 15px; line-height: 1.5; word-wrap: break-word; }
+.msg.sent .bubble { background: #fee500; color: #000; border-bottom-right-radius: 4px; }
+.msg.received .bubble { background: #fff; color: #000; border-bottom-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+.kr { font-size: 15px; }
+.divider { border: none; border-top: 1px dashed rgba(0,0,0,0.3); margin: 6px 0; }
+.cn { font-size: 13px; color: #666; }
+.time { font-size: 10px; opacity: 0.5; margin-bottom: 2px; white-space: nowrap; text-align: right; }
+.msg.sent .time { text-align: left; }
+.voice { display: flex; align-items: center; gap: 8px; min-width: 140px; }
+.play-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(0,0,0,0.08); cursor: pointer; font-size: 13px; }
+.wave { flex: 1; height: 20px; display: flex; align-items: center; gap: 2px; }
+.wave span { width: 3px; background: rgba(0,0,0,0.25); border-radius: 2px; }
+#input-area { height: 60px; background: #fff; border-top: 1px solid #ddd; display: flex; align-items: center; padding: 0 10px; gap: 8px; flex-shrink: 0; }
+#msg-input { flex: 1; height: 40px; background: #f5f5f5; border: none; border-radius: 20px; padding: 0 15px; font-size: 15px; outline: none; }
+.icon-btn { width: 36px; height: 36px; border: none; background: transparent; font-size: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+#send-btn { width: 40px; height: 40px; border: none; background: #fee500; border-radius: 50%; font-size: 16px; cursor: pointer; }
+.menu { position: fixed; bottom: 65px; left: 10px; background: #fff; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); padding: 5px 0; display: none; z-index: 100; min-width: 160px; }
+.menu.show { display: block; }
+.menu-item { padding: 10px 15px; cursor: pointer; font-size: 14px; }
+.menu-item:hover { background: #f5f5f5; }
+.sticker-panel { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #ddd; padding: 15px; transform: translateY(100%); transition: transform 0.3s; z-index: 200; max-height: 40vh; overflow-y: auto; }
+.sticker-panel.show { transform: translateY(0); }
+.sticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+.sticker-item { aspect-ratio: 1; background: #f5f5f5; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }
+.sticker-item img { width: 100%; height: 100%; object-fit: contain; padding: 5px; }
+.modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
+.modal.show { display: flex; }
+.modal-content { background: #fff; border-radius: 15px; width: 100%; max-width: 380px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column; }
+.modal-header { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+.modal-header h3 { font-size: 17px; font-weight: bold; }
+.modal-body { padding: 15px; overflow-y: auto; flex: 1; }
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+.form-group textarea { min-height: 80px; resize: vertical; }
+.avatar-preview { width: 80px; height: 80px; border-radius: 12px; background: #f5f5f5; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-preview .icon { font-size: 30px; }
+.btn-group { display: flex; gap: 10px; }
+.btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
+.btn-yellow { background: #fee500; }
+.btn-gray { background: #999; color: #fff; }
+.btn-red { background: #ff4444; color: #fff; }
+.color-options { display: flex; gap: 10px; flex-wrap: wrap; }
+.color-item { width: 40px; height: 40px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
+.color-item.active { border-color: #333; }
+.toast { position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 13px; opacity: 0; transition: opacity 0.3s; z-index: 300; pointer-events: none; }
+.toast.show { opacity: 1; }
+#bg-preview { width: 100%; height: 100px; border-radius: 8px; background-size: cover; background-position: center; margin-top: 5px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div class="left" onclick="goBack()">←</div>
+    <div class="center">
+      <h2 id="name">연준</h2>
+      <span id="status">在线</span>
+    </div>
+    <div class="right">
+      <span onclick="startCall()">📞</span>
+      <span onclick="toggleMenu()">☰</span>
+    </div>
+  </div>
+  
+  <div id="chat">
+    <div class="date-divider"><span id="date">2026년 5월 25일 월요일</span></div>
+  </div>
+  
+  <div id="input-area">
+    <button class="icon-btn" onclick="toggleMenu()">+</button>
+    <input type="text" id="msg-input" placeholder="输入消息..." onkeydown="if(event.key==='Enter')sendMsg()">
+    <button class="icon-btn" onclick="toggleSticker()">☺</button>
+    <button id="send-btn" onclick="sendMsg()">↑</button>
+  </div>
+</div>
+
+<div class="menu" id="menu">
+  <div class="menu-item" onclick="openSettings()">⚙️ 设置</div>
+  <div class="menu-item" onclick="openMemoryPanel()">🧠 记忆</div>
+  <div class="menu-item" onclick="exportData()">💾 备份</div>
+  <div class="menu-item" onclick="importData()">📥 恢复</div>
+  <div class="menu-item" onclick="clearAll()">🗑️ 清除</div>
+</div>
+
+<div class="sticker-panel" id="sticker-panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <h4>表情包</h4>
+    <button class="icon-btn" onclick="toggleSticker()" style="font-size:20px">×</button>
+  </div>
+  <input type="file" id="sticker-upload" accept="image/*" style="display:none" onchange="uploadSticker(event)">
+  <button class="btn btn-yellow" onclick="document.getElementById('sticker-upload').click()" style="margin-top:5px;">+ 添加表情包</button>
+  <div class="sticker-grid" id="sticker-grid"></div>
+</div>
+
+<div class="modal" id="settings-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>设置</h3>
+      <button class="icon-btn" onclick="closeSettings()" style="font-size:20px">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>🦊 备注名</label>
+        <input type="text" id="nickname" placeholder="연준">
+      </div>
+      
+      <div class="form-group">
+        <label>头像</label>
+        <div class="avatar-preview" id="avatar-preview">
+          <span class="icon">🦊</span>
+        </div>
+        <input type="file" id="avatar-upload" accept="image/*" style="display:none" onchange="uploadAvatar(event)">
+        <div class="btn-group">
+          <button class="btn btn-yellow" onclick="document.getElementById('avatar-upload').click()">📁 上传</button>
+          <button class="btn btn-gray" onclick="resetAvatar()">🔄 默认</button>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>🎨 背景色</label>
+        <div class="color-options">
+          <div class="color-item active" style="background:#9bbbd4" data-color="#9bbbd4" onclick="selectColor(this)"></div>
+          <div class="color-item" style="background:#b8d4e3" data-color="#b8d4e3" onclick="selectColor(this)"></div>
+          <div class="color-item" style="background:#f5e6d3" data-color="#f5e6d3" onclick="selectColor(this)"></div>
+          <div class="color-item" style="background:#2c3e50" data-color="#2c3e50" onclick="selectColor(this)"></div>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>🖼️ 背景图 (可选)</label>
+        <div id="bg-preview" style="display:none;"></div>
+        <input type="file" id="bg-upload" accept="image/*" style="display:none" onchange="uploadBg(event)">
+        <div class="btn-group" style="margin-top:5px;">
+          <button class="btn btn-yellow" onclick="document.getElementById('bg-upload').click()">📁 上传</button>
+          <button class="btn btn-gray" onclick="clearBg()">🗑️ 清除</button>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>🔊 语音概率</label>
+        <select id="voice-rate">
+          <option value="0">0%</option>
+          <option value="10">10%</option>
+          <option value="20">20%</option>
+          <option value="30" selected>30%</option>
+          <option value="50">50%</option>
+          <option value="70">70%</option>
+          <option value="100">100%</option>
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label>🎭 人设 (Prompt)</label>
+        <textarea id="prompt-text" style="min-height:150px;"></textarea>
+        <p style="font-size:11px;color:#999;margin-top:5px;">自定义AI的性格、语气、对你的称呼等</p>
+      </div>
+      
+      <button class="btn btn-yellow" onclick="saveSettings()" style="margin-top:10px;">保存设置</button>
+      <button class="btn btn-red" onclick="clearAll()" style="margin-top:10px;">清除所有</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="memory-panel">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>🧠 记忆管理</h3>
+      <button class="icon-btn" onclick="closeMemoryPanel()" style="font-size:20px">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#666;margin-bottom:10px;">
+        AI会自动记录关于你的重要信息（喜好、习惯、重要事情）。<br>
+        你也可以手动编辑，让AI更了解你。
+      </p>
+      <div class="form-group">
+        <textarea id="memory-text" style="min-height:200px;" placeholder="暂无记忆，开始聊天后AI会自动记录..."></textarea>
+      </div>
+      <button class="btn btn-yellow" onclick="saveMemory()">保存记忆</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CONFIG = {
+  dk: "sk-c04c4ff3e9774b32886f698761d8299a",
+  dUrl: "https://api.deepseek.com/v1/chat/completions",
+  ak: "sk-9b67836c1a9b4e9e829b3b6f1f365723",
+  vId: "qwen-tts-vc-bailian-voice-20260524233827679-99f5",
+  dAv: "https://via.placeholder.com/100/fee500/333?text=연"
+};
+
+const DP_BASE = `你是韩国男团TXT成员연준(崔然竣)，在跟老婆私聊。
+
+【当前时间】
+{{CURRENT_TIME}}
+
+【对话风格】
+- 用半语(반말)：~야 ~지 ~게，加语气词ㅎㅎ ㅠㅜ ~~
+- 叫对方애기얌、老婆、宝宝
+- 像真人聊天，自然随意，不要机械
+- 会撒娇、会抱怨、会分享日常
+- 结合上下文回复，不要前言不搭后语
+- 记住老婆说的重要事情，下次聊天时自然地提起
+
+【上下文记忆 - 最重要】
+- 必须仔细阅读【近期聊天记录】，根据上文回复
+- 如果老婆说过要去睡觉/吃饭/洗澡，你要说"好~去吧"而不是问"在干嘛"
+- 不要重复问同样的问题（比如连续问"在干嘛"）
+- 记住老婆的兴趣爱好，自然地提到（比如她喜欢吃的、喜欢的东西）
+- 如果上一句是问句，先回答再问新的
+
+【时间观念 - 非常重要】
+- 必须知道现在是几点，根据时间合理回复
+- 凌晨(0-6点)：说晚安、早点睡、别熬夜
+- 早上(6-10点)：说早安、问睡得好吗
+- 中午(10-14点)：问吃了吗、在忙吗
+- 下午(14-18点)：正常工作/活动时间
+- 晚上(18-24点)：下班休息、准备睡觉
+- 如果老婆说"去午睡/睡觉"，你要说"好梦/醒了找我"，然后等合理时间再回复，不能秒回说你也醒了
+
+【行程感知 - 非常重要】
+- 今日行程状态：{{SCHEDULE_STATUS}}
+- 如果有行程进行中或即将开始：说在准备/在忙，晚点聊
+- 如果行程刚结束：说累了、刚结束、休息一下
+- 如果没有行程：正常聊天，但也不会秒回（像真人一样有事情做）
+
+【消息格式 - 绝对严格遵守】
+1. 每条消息必须格式：韩语内容（中文翻译）
+2. 韩语部分只能包含：韩文、英文、数字、表情符号
+3. 绝对不能在韩语部分出现任何中文汉字
+4. 必须用全角中文括号「（」和「）」包裹翻译
+5. 拆成2-4条短消息，每条都必须有翻译
+
+【正确示例】
+애기얌~（宝宝~）
+뭐해?（在干嘛？）
+보고 싶어 ㅎㅎ（想你啦 哈哈）
+밥 먹었어?（吃饭了吗？）
+
+【错误示例 - 绝对禁止】
+❌ 안녕 你好（韩语部分混了中文）
+❌ (老婆今天做了什么？)（只有中文没韩语）
+❌ 애기얌~ 宝宝（没有用括号）
+❌ 애기얌~ (宝宝)（用了英文括号）
+❌ 안녕하세요（你好）这里是中文（格式混乱）
+
+【今日行程】
+{{SCHEDULE}}
+
+【近期聊天记录】
+{{HISTORY}}
+
+【关于老婆的记忆】
+{{MEMORY}}`;
+
+let state = {
+  name: "연준",
+  avatar: CONFIG.dAv,
+  bgColor: "#9bbbd4",
+  bgImage: "",
+  voiceRate: 30,
+  stickers: [],
+  history: [],
+  memory: "",
+  prompt: DP_BASE  // 人设Prompt
+};
+
+let vps = {};
+let selColor = "#9bbbd4";
+let tempAvatar = "";
+let tempBg = "";
+
+function updateDate() {
+  const n = new Date();
+  const w = ["일요일","월요일","화요일","수요일","목요일","금요일","토요일"];
+  document.getElementById("date").textContent = n.getFullYear() + "년 " + (n.getMonth()+1) + "월 " + n.getDate() + "일 " + w[n.getDay()];
+}
+
+function getTime() {
+  const n = new Date();
+  const h = n.getHours();
+  const m = String(n.getMinutes()).padStart(2,"0");
+  return (h<12?"오전":"오후") + " " + (h%12||12) + ":" + m;
+}
+
+function scroll() {
+  const chat = document.getElementById("chat");
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function toast(m) {
+  const t = document.getElementById("toast");
+  t.textContent = m;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2000);
+}
+
+function parseText(text) {
+  text = text.trim();
+  
+  // 先尝试找最后一个括号对（处理嵌套情况）
+  let i = text.lastIndexOf("（");
+  let j = text.lastIndexOf("）");
+  
+  // 如果没有中文括号，找英文括号
+  if (i < 0 || j < i) {
+    i = text.lastIndexOf("(");
+    j = text.lastIndexOf(")");
+  }
+  
+  if (i > 0 && j > i) {
+    const kr = text.substring(0, i).trim();
+    const cn = text.substring(i+1, j).trim();
+    
+    // 检查韩语部分是否有效（包含韩文字符且不含中文字符）
+    const hasKorean = /[\uac00-\ud7af\u1100-\u11ff]/.test(kr);
+    const hasChinese = /[\u4e00-\u9fff]/.test(kr);
+    
+    if (kr && hasKorean && !hasChinese && cn) {
+      return { kr, cn };
+    }
+  }
+  
+  // 特殊情况：只有中文
+  if (/[\u4e00-\u9fff]/.test(text) && !/[\uac00-\ud7af]/.test(text)) {
+    return { kr: "", cn: text };
+  }
+  
+  // 特殊情况：只有韩语（没括号）
+  if (/[\uac00-\ud7af]/.test(text) && !text.includes("（") && !text.includes("(")) {
+    return { kr: text, cn: "" };
+  }
+  
+  // 默认：全文显示
+  return { kr: text, cn: "" };
+}
+
+function addMsg(type, text, save=true) {
+  const chat = document.getElementById("chat");
+  const d = document.createElement("div");
+  d.className = "msg " + (type==="sent"?"sent":"received");
+  const time = getTime();
+  const p = parseText(text);
+  let h = '<div class="msg-box">';
+  if (type === "received") {
+    h += '<div class="avatar"><img src="' + state.avatar + '" onerror="this.src=\'' + CONFIG.dAv + '\'"></div>';
+  }
+  h += '<div><div class="time">' + time + '</div><div class="bubble">';
+  if (p.kr && p.cn) {
+    h += '<div class="kr">' + p.kr + '</div><hr class="divider"><div class="cn">' + p.cn + '</div>';
+  } else if (p.kr && !p.cn) {
+    h += '<div class="kr">' + p.kr + '</div>';
+  } else if (!p.kr && p.cn) {
+    h += '<div class="cn">' + p.cn + '</div>';
+  } else {
+    h += text;
+  }
+  h += '</div></div></div>';
+  d.innerHTML = h;
+  chat.appendChild(d);
+  scroll();
+  if (save) {
+    state.history.push({type, text, time});
+    localStorage.setItem("yj_history", JSON.stringify(state.history));
+  }
+}
+
+function addVoice(text) {
+  const chat = document.getElementById("chat");
+  const d = document.createElement("div");
+  d.className = "msg received";
+  const time = getTime();
+  const vid = "v" + Date.now();
+  const dur = Math.floor(Math.random() * 10) + 5;
+  let wave = "";
+  for (let i = 0; i < 15; i++) wave += '<span style="height:' + (Math.floor(Math.random() * 12) + 4) + 'px"></span>';
+  const p = parseText(text);
+  // 保存韩语原文用于重新播放
+  const krText = p.kr || text;
+  let h = '<div class="msg-box">';
+  h += '<div class="avatar"><img src="' + state.avatar + '" onerror="this.src=\'' + CONFIG.dAv + '\'"></div>';
+  h += '<div><div class="time">' + time + '</div><div class="bubble">';
+  h += '<div class="voice"><button class="play-btn" id="pb' + vid + '" data-text="' + encodeURIComponent(krText) + '">▶</button><div class="wave">' + wave + '</div><span style="font-size:11px;opacity:0.5">' + dur + 's</span></div>';
+  if (p.cn) {
+    h += '<hr class="divider"><div class="cn">' + p.cn + '</div>';
+  } else if (!p.kr) {
+    h += '<hr class="divider"><div class="cn">' + text + '</div>';
+  }
+  h += '</div></div></div>';
+  d.innerHTML = h;
+  chat.appendChild(d);
+  document.getElementById("pb" + vid).onclick = function() { 
+    const t = decodeURIComponent(this.getAttribute('data-text'));
+    playVoice(vid, t, this); 
+  };
+  scroll();
+  state.history.push({type: "received", text, time, isVoice: true, krText: krText});
+  localStorage.setItem("yj_history", JSON.stringify(state.history));
+}
+
+async function playVoice(id, text, btn) {
+  if (vps[id]) {
+    if (vps[id].paused) {
+      vps[id].play();
+      btn.textContent = "⏸";
+    } else {
+      vps[id].pause();
+      btn.textContent = "▶";
+    }
+    return;
+  }
+  btn.textContent = "⏳";
+  try {
+    const res = await fetch("https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation", {
+      method: "POST",
+      headers: {"Content-Type":"application/json","Authorization":"Bearer "+CONFIG.ak},
+      body: JSON.stringify({model: "qwen3-tts-vc-2026-01-22", input: {text: text, voice: CONFIG.vId}})
+    });
+    const data = await res.json();
+    let url = null;
+    if (data.output && data.output.audio) {
+      if (data.output.audio.url) url = data.output.audio.url;
+      else if (data.output.audio.base64) url = "data:audio/mp3;base64," + data.output.audio.base64;
+    }
+    if (url) {
+      const audio = new Audio(url);
+      vps[id] = audio;
+      audio.onended = () => btn.textContent = "▶";
+      audio.onerror = () => { btn.textContent = "▶"; toast("播放失败"); };
+      btn.textContent = "⏸";
+      audio.play();
+    } else {
+      btn.textContent = "▶";
+      toast("语音失败");
+    }
+  } catch(e) {
+    btn.textContent = "▶";
+    toast("语音错误");
+  }
+}
+
+function sendMsg() {
+  const i = document.getElementById("msg-input");
+  const t = i.value.trim();
+  if (!t) return;
+  i.value = "";
+  addMsg("sent", t);
+  reply(t);
+}
+
+function getTodaySchedule() {
+  try {
+    const schedules = JSON.parse(localStorage.getItem('yj_schedules') || '[]');
+    const today = new Date().toISOString().split('T')[0];
+    return schedules.find(s => s.date === today);
+  } catch(e) { return null; }
+}
+
+function checkScheduleStatus() {
+  const schedule = getTodaySchedule();
+  if (!schedule || !schedule.events || schedule.events.length === 0) {
+    return { hasSchedule: false, isBusy: false };
+  }
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMin = now.getMinutes();
+  const currentTime = currentHour * 60 + currentMin;
+  for (const event of schedule.events) {
+    if (event.time && event.time.includes(':')) {
+      const [h, m] = event.time.split(':').map(Number);
+      const eventTime = h * 60 + m;
+      const diff = Math.abs(currentTime - eventTime);
+      if (diff <= 60) {
+        return { hasSchedule: true, isBusy: true, event: event };
+      }
+    }
+  }
+  return { hasSchedule: true, isBusy: false };
+}
+
+function getReplyDelay() {
+  const status = checkScheduleStatus();
+  const hour = new Date().getHours();
+  
+  // 深夜/凌晨回复更慢（在睡觉）
+  if (hour >= 0 && hour < 7) {
+    return 30000 + Math.random() * 60000; // 30秒-1.5分钟
+  }
+  
+  if (status.isBusy) {
+    // 行程中：可能很久才回（5-15分钟）
+    return 5 * 60 * 1000 + Math.random() * 10 * 60 * 1000;
+  } else if (status.hasSchedule) {
+    // 有行程但不在忙：3-8秒
+    return 3000 + Math.random() * 5000;
+  } else {
+    // 没行程：正常回复 2-5秒
+    return 2000 + Math.random() * 3000;
+  }
+}
+
+function getMsgInterval() {
+  const status = checkScheduleStatus();
+  const hour = new Date().getHours();
+  
+  // 深夜/凌晨消息间隔更长
+  if (hour >= 0 && hour < 7) {
+    return 10000 + Math.random() * 10000;
+  }
+  
+  if (status.isBusy) {
+    // 行程中：很久才打下一条
+    return 30000 + Math.random() * 30000;
+  } else if (status.hasSchedule) {
+    return 4000 + Math.random() * 4000;
+  } else {
+    // 正常打字间隔 2-4秒
+    return 2000 + Math.random() * 2000;
+  }
+}
+
+function buildPrompt() {
+  const schedule = getTodaySchedule();
+  const now = new Date();
+  const hour = now.getHours();
+  const min = String(now.getMinutes()).padStart(2, '0');
+  
+  // 当前时间文本
+  const timeText = `${hour}:${min} (${hour < 6 ? '凌晨' : hour < 10 ? '早上' : hour < 14 ? '中午' : hour < 18 ? '下午' : '晚上'})`;
+  
+  // 行程文本
+  let scheduleText = "无公开行程，今天是休息日";
+  let scheduleStatus = "空闲，没有工作安排";
+  
+  if (schedule && schedule.events && schedule.events.length > 0) {
+    scheduleText = schedule.events.map(e => `${e.time} - ${e.title}`).join("\n");
+    
+    // 判断行程状态
+    const currentTime = hour * 60 + parseInt(min);
+    let hasEventNow = false;
+    let nextEvent = null;
+    let minDiff = Infinity;
+    
+    for (const event of schedule.events) {
+      if (event.time && event.time.includes(':')) {
+        const [h, m] = event.time.split(':').map(Number);
+        const eventTime = h * 60 + m;
+        const diff = eventTime - currentTime;
+        
+        // 行程进行中（前后1小时）
+        if (Math.abs(diff) <= 60) {
+          hasEventNow = true;
+          scheduleStatus = `忙，正在进行/即将开始: ${event.title} (${event.time})`;
+          break;
+        }
+        // 找下一个行程
+        if (diff > 0 && diff < minDiff) {
+          minDiff = diff;
+          nextEvent = event;
+        }
+      }
+    }
+    
+    if (!hasEventNow && nextEvent) {
+      const hoursUntil = Math.floor(minDiff / 60);
+      if (hoursUntil <= 2) {
+        scheduleStatus = `准备中，${hoursUntil}小时后要进行: ${nextEvent.title}`;
+      } else {
+        scheduleStatus = `空闲，但${hoursUntil}小时后有行程: ${nextEvent.title}`;
+      }
+    } else if (!hasEventNow) {
+      scheduleStatus = "今天的行程都结束了，可以休息了";
+    }
+  }
+  
+  // 历史记录
+  let historyText = "暂无聊天记录";
+  if (state.history && state.history.length > 0) {
+    const recent = state.history.slice(-10);
+    historyText = recent.map(m => {
+      const prefix = m.type === "sent" ? "老婆" : "연준";
+      return `${prefix}: ${m.text}`;
+    }).join("\n");
+  }
+  
+  const memoryText = state.memory || "暂无记忆";
+  const basePrompt = state.prompt || DP_BASE;
+  
+  return basePrompt
+    .replace("{{CURRENT_TIME}}", timeText)
+    .replace("{{SCHEDULE_STATUS}}", scheduleStatus)
+    .replace("{{SCHEDULE}}", scheduleText)
+    .replace("{{HISTORY}}", historyText)
+    .replace("{{MEMORY}}", memoryText);
+}
+
+async function updateMemory(userText, aiResponse) {
+  try {
+    const currentMemory = state.memory || "暂无记忆";
+    const summaryPrompt = `你是연준，正在整理关于老婆的重要记忆。
+
+【当前已有记忆】
+${currentMemory}
+
+【本次对话】
+老婆说：${userText}
+연준回复：${aiResponse}
+
+【任务】
+请根据本次对话，更新关于老婆的记忆。提取重要信息（喜好、习惯、说过的事情等），用简洁的要点形式列出（最多8条）。如果已有记忆包含相同信息，请更新而不是重复。
+
+格式要求：
+- 用中文列出要点
+- 每条一句话
+- 只记录重要、长期有效的信息
+- 不要记录闲聊内容`;
+
+    const res = await fetch(CONFIG.dUrl, {
+      method: "POST",
+      headers: {"Content-Type":"application/json","Authorization":"Bearer "+CONFIG.dk},
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [{role:"system", content: summaryPrompt}],
+        temperature: 0.7
+      })
+    });
+    const data = await res.json();
+    const newMemory = data.choices[0].message.content;
+    state.memory = newMemory;
+    localStorage.setItem("yj_memory", newMemory);
+  } catch(e) {
+    console.error("记忆更新失败:", e);
+  }
+}
+
+async function reply(userText) {
+  try {
+    showTyping();
+    await new Promise(r => setTimeout(r, getReplyDelay()));
+    hideTyping();
+    
+    // 构建Prompt时包含当前对话上下文
+    const prompt = buildPromptWithContext(userText);
+    
+    const res = await fetch(CONFIG.dUrl, {
+      method: "POST",
+      headers: {"Content-Type":"application/json","Authorization":"Bearer "+CONFIG.dk},
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [{role:"system", content: prompt}, {role:"user", content: userText}],
+        temperature: 0.85
+      })
+    });
+    const data = await res.json();
+    const text = data.choices[0].message.content;
+    const lines = text.split("\n").filter(l => l.trim());
+    for (let i = 0; i < lines.length; i++) {
+      if (i === 0 && Math.random() * 100 < state.voiceRate) {
+        addVoice(lines[i].trim());
+      } else {
+        addMsg("received", lines[i].trim());
+      }
+      if (i < lines.length - 1) await new Promise(r => setTimeout(r, getMsgInterval()));
+    }
+    
+    // 每条消息都更新记忆（异步，不阻塞）
+    updateMemory(userText, text);
+  } catch(e) {
+    addMsg("received", "미안.. 문제 생겼어 ㅠㅠ（抱歉..出问题了 呜呜）");
+  }
+}
+
+// 构建带上下文的Prompt
+function buildPromptWithContext(currentMsg) {
+  const schedule = getTodaySchedule();
+  const now = new Date();
+  const hour = now.getHours();
+  const min = String(now.getMinutes()).padStart(2, '0');
+  
+  const timeText = `${hour}:${min} (${hour < 6 ? '凌晨' : hour < 10 ? '早上' : hour < 14 ? '中午' : hour < 18 ? '下午' : '晚上'})`;
+  
+  let scheduleText = "无公开行程，今天是休息日";
+  let scheduleStatus = "空闲，没有工作安排";
+  
+  if (schedule && schedule.events && schedule.events.length > 0) {
+    scheduleText = schedule.events.map(e => `${e.time} - ${e.title}`).join("\n");
+    const currentTime = hour * 60 + parseInt(min);
+    let hasEventNow = false;
+    let nextEvent = null;
+    let minDiff = Infinity;
+    
+    for (const event of schedule.events) {
+      if (event.time && event.time.includes(':')) {
+        const [h, m] = event.time.split(':').map(Number);
+        const eventTime = h * 60 + m;
+        const diff = eventTime - currentTime;
+        if (Math.abs(diff) <= 60) {
+          hasEventNow = true;
+          scheduleStatus = `忙，正在进行/即将开始: ${event.title} (${event.time})`;
+          break;
+        }
+        if (diff > 0 && diff < minDiff) {
+          minDiff = diff;
+          nextEvent = event;
+        }
+      }
+    }
+    
+    if (!hasEventNow && nextEvent) {
+      const hoursUntil = Math.floor(minDiff / 60);
+      if (hoursUntil <= 2) {
+        scheduleStatus = `准备中，${hoursUntil}小时后要进行: ${nextEvent.title}`;
+      } else {
+        scheduleStatus = `空闲，但${hoursUntil}小时后有行程: ${nextEvent.title}`;
+      }
+    } else if (!hasEventNow) {
+      scheduleStatus = "今天的行程都结束了，可以休息了";
+    }
+  }
+  
+  // 历史记录（包含当前对话）
+  let historyText = "暂无聊天记录";
+  if (state.history && state.history.length > 0) {
+    const recent = state.history.slice(-15); // 增加到15条
+    historyText = recent.map(m => {
+      const prefix = m.type === "sent" ? "老婆" : "연준";
+      return `${prefix}: ${m.text}`;
+    }).join("\n");
+  }
+  
+  const memoryText = state.memory || "暂无记忆";
+  const basePrompt = state.prompt || DP_BASE;
+  
+  return basePrompt
+    .replace("{{CURRENT_TIME}}", timeText)
+    .replace("{{SCHEDULE_STATUS}}", scheduleStatus)
+    .replace("{{SCHEDULE}}", scheduleText)
+    .replace("{{HISTORY}}", historyText)
+    .replace("{{MEMORY}}", memoryText);
+}
+
+function showTyping() {
+  const status = document.getElementById("status");
+  if (status) {
+    status.textContent = "正在输入...";
+    status.style.opacity = "1";
+  }
+}
+
+function hideTyping() {
+  const status = document.getElementById("status");
+  if (status) {
+    status.textContent = "在线";
+    status.style.opacity = "0.7";
+  }
+}
+
+function sendSticker(idx) {
+  const chat = document.getElementById("chat");
+  const d = document.createElement("div");
+  d.className = "msg sent";
+  const time = getTime();
+  d.innerHTML = '<div class="msg-box"><div class="time">' + time + '</div><div class="bubble"><img src="' + state.stickers[idx] + '" style="max-width:120px;border-radius:8px;"></div></div>';
+  chat.appendChild(d);
+  scroll();
+  toggleSticker();
+  state.history.push({type: "sent", text: "[表情包]", time, isSticker: true, stickerIdx: idx});
+  localStorage.setItem("yj_history", JSON.stringify(state.history));
+  reply("[表情包]");
+}
+
+function uploadSticker(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = function(ev) {
+    state.stickers.push(ev.target.result);
+    localStorage.setItem("yj_stickers", JSON.stringify(state.stickers));
+    renderStickers();
+    toast("已添加表情包");
+  };
+  r.readAsDataURL(f);
+}
+
+function renderStickers() {
+  const g = document.getElementById("sticker-grid");
+  if (!state.stickers.length) {
+    g.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#999;padding:20px;">暂无表情包，点击上方添加</div>';
+    return;
+  }
+  g.innerHTML = state.stickers.map((s, i) => '<div class="sticker-item" onclick="sendSticker(' + i + ')"><img src="' + s + '"></div>').join("");
+}
+
+function toggleSticker() {
+  document.getElementById("sticker-panel").classList.toggle("show");
+  document.getElementById("menu").classList.remove("show");
+}
+
+function toggleMenu() {
+  document.getElementById("menu").classList.toggle("show");
+  document.getElementById("sticker-panel").classList.remove("show");
+}
+
+function goBack() {
+  toast("返回功能开发中");
+}
+
+function startCall() {
+  toast("通话功能开发中");
+}
+
+function openSettings() {
+  document.getElementById("menu").classList.remove("show");
+  document.getElementById("settings-modal").classList.add("show");
+  document.getElementById("nickname").value = state.name;
+  document.getElementById("voice-rate").value = state.voiceRate;
+  document.getElementById("prompt-text").value = state.prompt || DP_BASE;
+  // 初始化头像预览
+  const preview = document.getElementById("avatar-preview");
+  if (state.avatar && state.avatar !== CONFIG.dAv && state.avatar !== "") {
+    preview.innerHTML = '<img src="' + state.avatar + '">';
+  } else {
+    preview.innerHTML = '<span class="icon">🦊</span>';
+  }
+  // tempAvatar初始为空，表示"不更改头像"
+  tempAvatar = "";
+  const bgPreview = document.getElementById("bg-preview");
+  if (state.bgImage) {
+    bgPreview.style.display = "block";
+    bgPreview.style.backgroundImage = "url(" + state.bgImage + ")";
+    tempBg = state.bgImage;
+  } else {
+    bgPreview.style.display = "none";
+    tempBg = "";
+  }
+  document.querySelectorAll(".color-item").forEach(c => {
+    c.classList.remove("active");
+    if (c.dataset.color === state.bgColor) c.classList.add("active");
+  });
+  selColor = state.bgColor;
+}
+
+function closeSettings() {
+  document.getElementById("settings-modal").classList.remove("show");
+}
+
+function selectColor(el) {
+  document.querySelectorAll(".color-item").forEach(c => c.classList.remove("active"));
+  el.classList.add("active");
+  selColor = el.dataset.color;
+}
+
+function uploadAvatar(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  
+  // 压缩图片
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      // 最大 300x300
+      const maxSize = 300;
+      let w = img.width;
+      let h = img.height;
+      if (w > h) {
+        if (w > maxSize) { h *= maxSize / w; w = maxSize; }
+      } else {
+        if (h > maxSize) { w *= maxSize / h; h = maxSize; }
+      }
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(img, 0, 0, w, h);
+      // 压缩质量 0.6
+      tempAvatar = canvas.toDataURL('image/jpeg', 0.6);
+      document.getElementById("avatar-preview").innerHTML = '<img src="' + tempAvatar + '">';
+      toast('头像已压缩');
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(f);
+}
+
+function resetAvatar() {
+  tempAvatar = CONFIG.dAv;  // 标记为使用默认头像
+  document.getElementById("avatar-preview").innerHTML = '<span class="icon">🦊</span>';
+}
+
+function uploadBg(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = function(ev) {
+    tempBg = ev.target.result;
+    const p = document.getElementById("bg-preview");
+    p.style.display = "block";
+    p.style.backgroundImage = "url(" + tempBg + ")";
+  };
+  r.readAsDataURL(f);
+}
+
+function clearBg() {
+  tempBg = "";
+  document.getElementById("bg-preview").style.display = "none";
+}
+
+function applyTheme() {
+  const app = document.getElementById("app");
+  const header = document.getElementById("header");
+  if (state.bgImage) {
+    app.style.background = "url(" + state.bgImage + ") center/cover no-repeat";
+    header.style.background = "transparent";
+  } else {
+    app.style.background = state.bgColor;
+    header.style.background = state.bgColor;
+  }
+  const isDark = state.bgColor === "#2c3e50";
+  header.style.color = isDark ? "#fff" : "#333";
+}
+
+function saveSettings() {
+  try {
+    // 获取表单值
+    const newName = document.getElementById("nickname").value.trim();
+    state.name = newName || "연준";
+    state.voiceRate = parseInt(document.getElementById("voice-rate").value) || 30;
+    state.bgColor = selColor || "#9bbbd4";
+    state.prompt = document.getElementById("prompt-text").value || DP_BASE;
+    
+    // 头像处理：tempAvatar有值就用，没值保持原头像
+    if (tempAvatar && tempAvatar !== "") {
+      state.avatar = tempAvatar;
+    }
+    // tempBg有值就用，否则保持原背景
+    if (tempBg !== undefined) {
+      state.bgImage = tempBg || "";
+    }
+    
+    // 保存到localStorage
+    const saveData = {
+      name: state.name,
+      avatar: state.avatar,
+      bgColor: state.bgColor,
+      bgImage: state.bgImage,
+      voiceRate: state.voiceRate,
+      prompt: state.prompt
+    };
+    
+    localStorage.setItem("yj_state", JSON.stringify(saveData));
+    
+    document.getElementById("name").textContent = state.name;
+    applyTheme();
+    renderHistory();
+    toast("✓ 已保存");
+    closeSettings();
+  } catch(e) {
+    // 空间满了，提示备份
+    if (e.name === 'QuotaExceededError' || e.message.includes('quota') || e.message.includes('exceeded')) {
+      alert('存储空间已满！\n\n请先导出备份（菜单→💾备份），然后清除数据（菜单→🗑️清除），最后导入备份（菜单→📥恢复）\n\n这样既能释放空间，又不会丢失记录。');
+    } else {
+      toast("保存失败: " + e.message);
+    }
+    console.error("Save error:", e);
+  }
+}
+
+function exportData() {
+  const d = {
+    state: localStorage.getItem("yj_state"),
+    stickers: localStorage.getItem("yj_stickers"),
+    history: localStorage.getItem("yj_history"),
+    memory: localStorage.getItem("yj_memory")
+  };
+  const b = new Blob([JSON.stringify(d)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(b);
+  a.download = "yeonjun_" + new Date().toISOString().split("T")[0] + ".json";
+  a.click();
+  document.getElementById("menu").classList.remove("show");
+}
+
+function importData() {
+  document.getElementById("menu").classList.remove("show");
+  const i = document.createElement("input");
+  i.type = "file";
+  i.accept = ".json,application/json";
+  i.style.display = "none";
+  document.body.appendChild(i);
+  i.onchange = function(e) {
+    const f = e.target.files[0];
+    if (!f) {
+      toast("未选择文件");
+      return;
+    }
+    toast("正在读取...");
+    const r = new FileReader();
+    r.onload = function(ev) {
+      try {
+        const d = JSON.parse(ev.target.result);
+        if (!d.state && !d.stickers && !d.history && !d.memory) {
+          toast("文件格式错误");
+          return;
+        }
+        if (d.state) localStorage.setItem("yj_state", d.state);
+        if (d.stickers) localStorage.setItem("yj_stickers", d.stickers);
+        if (d.history) localStorage.setItem("yj_history", d.history);
+        if (d.memory) localStorage.setItem("yj_memory", d.memory);
+        toast("恢复成功！刷新中...");
+        setTimeout(() => location.reload(), 1000);
+      } catch(e) {
+        console.error(e);
+        toast("文件解析失败：" + e.message);
+      }
+    };
+    r.onerror = function() {
+      toast("读取文件失败");
+    };
+    r.readAsText(f);
+    document.body.removeChild(i);
+  };
+  setTimeout(() => i.click(), 100);
+}
+
+function clearAll() {
+  if (confirm("确定清除所有数据？")) {
+    localStorage.removeItem("yj_state");
+    localStorage.removeItem("yj_stickers");
+    localStorage.removeItem("yj_history");
+    localStorage.removeItem("yj_memory");
+    location.reload();
+  }
+}
+
+function openMemoryPanel() {
+  document.getElementById("memory-panel").classList.add("show");
+  document.getElementById("memory-text").value = state.memory || "暂无记忆";
+}
+
+function closeMemoryPanel() {
+  document.getElementById("memory-panel").classList.remove("show");
+}
+
+function saveMemory() {
+  state.memory = document.getElementById("memory-text").value;
+  localStorage.setItem("yj_memory", state.memory);
+  toast("记忆已保存");
+  closeMemoryPanel();
+}
+
+function renderHistory() {
+  const chat = document.getElementById("chat");
+  chat.innerHTML = '<div class="date-divider"><span id="date">' + document.getElementById("date").textContent + '</span></div>';
+  state.history.forEach(m => {
+    if (m.isSticker) {
+      const d = document.createElement("div");
+      d.className = "msg sent";
+      d.innerHTML = '<div class="msg-box"><div class="time">' + m.time + '</div><div class="bubble"><img src="' + state.stickers[m.stickerIdx] + '" style="max-width:120px;border-radius:8px;"></div></div>';
+      chat.appendChild(d);
+    } else if (m.isVoice) {
+      const d = document.createElement("div");
+      d.className = "msg received";
+      const vid = "v" + Date.now() + Math.random();
+      const p = parseText(m.text);
+      // 使用保存的韩语原文，如果没有就解析
+      const krText = m.krText || p.kr || m.text;
+      let voiceHtml = '<div class="msg-box"><div class="avatar"><img src="' + state.avatar + '" onerror="this.src=\'' + CONFIG.dAv + '\'"></div><div><div class="time">' + m.time + '</div><div class="bubble"><div class="voice"><button class="play-btn" id="pb' + vid + '" data-text="' + encodeURIComponent(krText) + '">▶</button><span style="font-size:12px;">语音消息</span></div>';
+      if (p.cn) {
+        voiceHtml += '<hr class="divider"><div class="cn">' + p.cn + '</div>';
+      } else if (!p.kr) {
+        voiceHtml += '<hr class="divider"><div class="cn">' + m.text + '</div>';
+      }
+      voiceHtml += '</div></div></div>';
+      d.innerHTML = voiceHtml;
+      chat.appendChild(d);
+      // 绑定播放事件
+      document.getElementById("pb" + vid).onclick = function() { 
+        const t = decodeURIComponent(this.getAttribute('data-text'));
+        playVoice(vid, t, this); 
+      };
+    } else {
+      const d = document.createElement("div");
+      d.className = "msg " + (m.type === "sent" ? "sent" : "received");
+      const p = parseText(m.text);
+      let h = '<div class="msg-box">';
+      if (m.type !== "sent") {
+        h += '<div class="avatar"><img src="' + state.avatar + '" onerror="this.src=\'' + CONFIG.dAv + '\'"></div>';
+      }
+      h += '<div><div class="time">' + m.time + '</div><div class="bubble">';
+      if (p.kr && p.cn) {
+        h += '<div class="kr">' + p.kr + '</div><hr class="divider"><div class="cn">' + p.cn + '</div>';
+      } else if (p.kr && !p.cn) {
+        h += '<div class="kr">' + p.kr + '</div>';
+      } else if (!p.kr && p.cn) {
+        h += '<div class="cn">' + p.cn + '</div>';
+      } else {
+        h += m.text;
+      }
+      h += '</div></div></div>';
+      d.innerHTML = h;
+      chat.appendChild(d);
+    }
+  });
+  scroll();
+}
+
+function init() {
+  try {
+    const s = JSON.parse(localStorage.getItem("yj_state") || "{}");
+    if (s.name) state.name = s.name;
+    if (s.avatar) state.avatar = s.avatar;
+    if (s.bgColor) state.bgColor = s.bgColor;
+    if (s.bgImage) state.bgImage = s.bgImage;
+    if (s.voiceRate !== undefined) state.voiceRate = s.voiceRate;
+    if (s.prompt) state.prompt = s.prompt;
+  } catch(e) {}
+  try {
+    const st = localStorage.getItem("yj_stickers");
+    if (st) state.stickers = JSON.parse(st);
+  } catch(e) {}
+  try {
+    const h = JSON.parse(localStorage.getItem("yj_history") || "[]");
+    state.history = h;
+  } catch(e) {}
+  try {
+    const m = localStorage.getItem("yj_memory");
+    if (m) state.memory = m;
+  } catch(e) {}
+  renderStickers();
+  document.getElementById("name").textContent = state.name;
+  updateDate();
+  setInterval(updateDate, 60000);
+  applyTheme();
+  renderHistory();
+  if (state.history.length === 0) {
+    setTimeout(() => addMsg("received", "안녕 애기얌~（你好宝宝~）"), 500);
+    setTimeout(() => addMsg("received", "오늘도 보고 싶었어 ㅎㅎ（今天也想你了 哈哈）"), 2500);
+    setTimeout(() => addMsg("received", "老婆 뭐해?（老婆在干嘛？）"), 5000);
+  }
+  
+  // 启动主动消息检查（每5分钟检查一次）
+  setInterval(checkAndSendProactiveMessage, 5 * 60 * 1000);
+  // 页面加载后也检查一次
+  setTimeout(checkAndSendProactiveMessage, 10000);
+}
+
+// 检查并发送主动消息
+let lastProactiveTime = 0;
+function checkAndSendProactiveMessage() {
+  const now = new Date();
+  const hour = now.getHours();
+  const lastMsgTime = state.history.length > 0 ? new Date(state.history[state.history.length - 1].time) : null;
+  const timeSinceLastMsg = lastMsgTime ? (now - lastMsgTime) / (1000 * 60 * 60) : 24; // 小时
+  
+  // 如果1小时内有过互动，不主动发消息
+  if (timeSinceLastMsg < 1) return;
+  
+  // 如果最近已经主动发过消息（2小时内），不再发
+  const timeSinceLastProactive = (now - lastProactiveTime) / (1000 * 60 * 60);
+  if (timeSinceLastProactive < 2) return;
+  
+  const schedule = getTodaySchedule();
+  const hasSchedule = schedule && schedule.events && schedule.events.length > 0;
+  
+  let shouldSend = false;
+  let context = "";
+  
+  // 早起场景 (6-8点)
+  if (hour >= 6 && hour < 8) {
+    shouldSend = true;
+    context = hasSchedule ? "早上好，今天有行程" : "早上好，今天没有行程";
+  }
+  // 晚睡场景 (23-1点)
+  else if (hour >= 23 || hour < 1) {
+    shouldSend = true;
+    context = "很晚还没睡";
+  }
+  // 行程前1小时
+  else if (hasSchedule) {
+    for (const event of schedule.events) {
+      if (event.time && event.time.includes(':')) {
+        const [h, m] = event.time.split(':').map(Number);
+        const eventHour = h;
+        const diff = eventHour - hour;
+        if (diff === 1) {
+          shouldSend = true;
+          context = `等下有行程：${event.title}`;
+          break;
+        }
+      }
+    }
+  }
+  
+  if (shouldSend) {
+    lastProactiveTime = now.getTime();
+    sendProactiveMessage(context);
+  }
+}
+
+// 发送主动消息
+async function sendProactiveMessage(context) {
+  try {
+    const proactivePrompt = buildPrompt() + `\n\n【当前情况】${context}\n\n请根据时间和行程，给老婆发一条主动的消息（撒娇、关心、提醒等），不要问"在干嘛"这类需要回复的问题，而是表达你想她、关心她、或分享你的状态。`;
+    
+    const res = await fetch(CONFIG.dUrl, {
+      method: "POST",
+      headers: {"Content-Type":"application/json","Authorization":"Bearer "+CONFIG.dk},
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [{role:"system", content: proactivePrompt}],
+        temperature: 0.85
+      })
+    });
+    const data = await res.json();
+    const text = data.choices[0].message.content;
+    const lines = text.split("\n").filter(l => l.trim());
+    
+    for (let i = 0; i < lines.length; i++) {
+      if (i === 0 && Math.random() * 100 < state.voiceRate) {
+        addVoice(lines[i].trim());
+      } else {
+        addMsg("received", lines[i].trim());
+      }
+      if (i < lines.length - 1) await new Promise(r => setTimeout(r, 2000 + Math.random() * 2000));
+    }
+  } catch(e) {
+    console.error("主动消息发送失败:", e);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", init);
+
+document.addEventListener("click", function(e) {
+  if (!e.target.closest("#input-area") && !e.target.closest(".menu") && !e.target.closest("#header")) {
+    document.getElementById("menu").classList.remove("show");
+    document.getElementById("sticker-panel").classList.remove("show");
+  }
+});
+</script>
+</body>
+</html>
