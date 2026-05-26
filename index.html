@@ -580,24 +580,24 @@ function sendMsg() {
   reply(t);
 }
 
-function getTodaySchedule() {
+function getTodaySchedules() {
   try {
     const schedules = JSON.parse(localStorage.getItem('yj_schedules') || '[]');
     const today = new Date().toISOString().split('T')[0];
-    return schedules.find(s => s.date === today);
-  } catch(e) { return null; }
+    return schedules.filter(s => s.date === today);
+  } catch(e) { return []; }
 }
 
 function checkScheduleStatus() {
-  const schedule = getTodaySchedule();
-  if (!schedule || !schedule.events || schedule.events.length === 0) {
+  const todaySchedules = getTodaySchedules();
+  if (!todaySchedules || todaySchedules.length === 0) {
     return { hasSchedule: false, isBusy: false };
   }
   const now = new Date();
   const currentHour = now.getHours();
   const currentMin = now.getMinutes();
   const currentTime = currentHour * 60 + currentMin;
-  for (const event of schedule.events) {
+  for (const event of todaySchedules) {
     if (event.time && event.time.includes(':')) {
       const [h, m] = event.time.split(':').map(Number);
       const eventTime = h * 60 + m;
@@ -614,20 +614,20 @@ function getReplyDelay() {
   const status = checkScheduleStatus();
   const hour = new Date().getHours();
   
-  // 深夜/凌晨回复更慢（在睡觉）
+  // 深夜/凌晨回复慢一些（在睡觉或休息）
   if (hour >= 0 && hour < 7) {
-    return 30000 + Math.random() * 60000; // 30秒-1.5分钟
+    return 10000 + Math.random() * 20000; // 10-30秒
   }
   
   if (status.isBusy) {
-    // 行程中：可能很久才回（5-15分钟）
-    return 5 * 60 * 1000 + Math.random() * 10 * 60 * 1000;
+    // 行程中：像真人在忙，30秒-2分钟回复
+    return 30000 + Math.random() * 90000;
   } else if (status.hasSchedule) {
-    // 有行程但不在忙：3-8秒
-    return 3000 + Math.random() * 5000;
+    // 有行程但不在忙：3-6秒
+    return 3000 + Math.random() * 3000;
   } else {
-    // 没行程：正常回复 2-5秒
-    return 2000 + Math.random() * 3000;
+    // 没行程：正常回复 2-4秒
+    return 2000 + Math.random() * 2000;
   }
 }
 
@@ -637,22 +637,22 @@ function getMsgInterval() {
   
   // 深夜/凌晨消息间隔更长
   if (hour >= 0 && hour < 7) {
-    return 10000 + Math.random() * 10000;
+    return 8000 + Math.random() * 7000; // 8-15秒
   }
   
   if (status.isBusy) {
-    // 行程中：很久才打下一条
-    return 30000 + Math.random() * 30000;
+    // 行程中：10-20秒打下一条
+    return 10000 + Math.random() * 10000;
   } else if (status.hasSchedule) {
-    return 4000 + Math.random() * 4000;
+    return 3000 + Math.random() * 3000; // 3-6秒
   } else {
-    // 正常打字间隔 2-4秒
-    return 2000 + Math.random() * 2000;
+    // 正常打字间隔 2-3秒
+    return 2000 + Math.random() * 1000;
   }
 }
 
 function buildPrompt() {
-  const schedule = getTodaySchedule();
+  const todaySchedules = getTodaySchedules();
   const now = new Date();
   const hour = now.getHours();
   const min = String(now.getMinutes()).padStart(2, '0');
@@ -664,8 +664,8 @@ function buildPrompt() {
   let scheduleText = "无公开行程，今天是休息日";
   let scheduleStatus = "空闲，没有工作安排";
   
-  if (schedule && schedule.events && schedule.events.length > 0) {
-    scheduleText = schedule.events.map(e => `${e.time} - ${e.title}`).join("\n");
+  if (todaySchedules && todaySchedules.length > 0) {
+    scheduleText = todaySchedules.map(e => `${e.time} - ${e.title}`).join("\n");
     
     // 判断行程状态
     const currentTime = hour * 60 + parseInt(min);
@@ -673,7 +673,7 @@ function buildPrompt() {
     let nextEvent = null;
     let minDiff = Infinity;
     
-    for (const event of schedule.events) {
+    for (const event of todaySchedules) {
       if (event.time && event.time.includes(':')) {
         const [h, m] = event.time.split(':').map(Number);
         const eventTime = h * 60 + m;
@@ -765,13 +765,52 @@ ${currentMemory}
   }
 }
 
+// 待回复队列
+let replyQueue = [];
+let isReplying = false;
+
 async function reply(userText) {
+  try {
+    const status = checkScheduleStatus();
+    
+    // 如果正在忙（行程进行中）
+    if (status.isBusy) {
+      // 先快速回复说在忙
+      addMsg("received", `애기얌~ 지금 ${status.event ? status.event.title : '스케줄'} 때문에 바빠서 바로 못 봤어（宝贝~现在在忙${status.event ? status.event.title : '行程'}，没能及时看消息）`);
+      await new Promise(r => setTimeout(r, 1500));
+      addMsg("received", `잠깐만 기다려줘~ 금방 끝나면 답장할게!（稍等一下哦~忙完就回你！）`);
+      
+      // 加入待回复队列
+      replyQueue.push({
+        text: userText,
+        time: new Date(),
+        isBusyReply: true
+      });
+      
+      // 设置定时器，10-15分钟后"忙完"再回复
+      const busyTime = 600000 + Math.random() * 300000; // 10-15分钟
+      setTimeout(() => {
+        processReplyQueue();
+      }, busyTime);
+      
+      return;
+    }
+    
+    // 正常回复流程
+    await processReply(userText);
+    
+  } catch(e) {
+    addMsg("received", "미안.. 문제 생겼어 ㅠㅠ（抱歉..出问题了 呜呜）");
+  }
+}
+
+// 处理单条回复
+async function processReply(userText) {
   try {
     showTyping();
     await new Promise(r => setTimeout(r, getReplyDelay()));
     hideTyping();
     
-    // 构建Prompt时包含当前对话上下文
     const prompt = buildPromptWithContext(userText);
     
     const res = await fetch(CONFIG.dUrl, {
@@ -786,6 +825,7 @@ async function reply(userText) {
     const data = await res.json();
     const text = data.choices[0].message.content;
     const lines = text.split("\n").filter(l => l.trim());
+    
     for (let i = 0; i < lines.length; i++) {
       if (i === 0 && Math.random() * 100 < state.voiceRate) {
         addVoice(lines[i].trim());
@@ -795,16 +835,42 @@ async function reply(userText) {
       if (i < lines.length - 1) await new Promise(r => setTimeout(r, getMsgInterval()));
     }
     
-    // 每条消息都更新记忆（异步，不阻塞）
     updateMemory(userText, text);
   } catch(e) {
     addMsg("received", "미안.. 문제 생겼어 ㅠㅠ（抱歉..出问题了 呜呜）");
   }
 }
 
+// 处理待回复队列
+async function processReplyQueue() {
+  if (replyQueue.length === 0) return;
+  
+  const status = checkScheduleStatus();
+  // 如果还在忙，延迟处理
+  if (status.isBusy) {
+    setTimeout(() => processReplyQueue(), 300000); // 5分钟后再试
+    return;
+  }
+  
+  // 忙完了，发送消息
+  addMsg("received", `드디어 끝났어!（终于忙完了！）`);
+  await new Promise(r => setTimeout(r, 1500));
+  
+  // 处理队列中的所有消息
+  while (replyQueue.length > 0) {
+    const item = replyQueue.shift();
+    addMsg("received", `아까 "${item.text.substring(0, 15)}${item.text.length > 15 ? '...' : ''}" 라고 했지?（刚才你说"${item.text.substring(0, 15)}${item.text.length > 15 ? '...' : ''}"对吧？）`);
+    await new Promise(r => setTimeout(r, 2000));
+    await processReply(item.text);
+    if (replyQueue.length > 0) {
+      await new Promise(r => setTimeout(r, 3000)); // 消息间隔
+    }
+  }
+}
+
 // 构建带上下文的Prompt
 function buildPromptWithContext(currentMsg) {
-  const schedule = getTodaySchedule();
+  const todaySchedules = getTodaySchedules();
   const now = new Date();
   const hour = now.getHours();
   const min = String(now.getMinutes()).padStart(2, '0');
@@ -814,14 +880,14 @@ function buildPromptWithContext(currentMsg) {
   let scheduleText = "无公开行程，今天是休息日";
   let scheduleStatus = "空闲，没有工作安排";
   
-  if (schedule && schedule.events && schedule.events.length > 0) {
-    scheduleText = schedule.events.map(e => `${e.time} - ${e.title}`).join("\n");
+  if (todaySchedules && todaySchedules.length > 0) {
+    scheduleText = todaySchedules.map(e => `${e.time} - ${e.title}`).join("\n");
     const currentTime = hour * 60 + parseInt(min);
     let hasEventNow = false;
     let nextEvent = null;
     let minDiff = Infinity;
     
-    for (const event of schedule.events) {
+    for (const event of todaySchedules) {
       if (event.time && event.time.includes(':')) {
         const [h, m] = event.time.split(':').map(Number);
         const eventTime = h * 60 + m;
@@ -1641,6 +1707,15 @@ function init() {
     setTimeout(() => addMsg("received", "老婆 뭐해?（老婆在干嘛？）"), 5000);
   }
   
+  // 注册 Service Worker（让后台也能运行）
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      console.log('Service Worker 注册成功');
+    }).catch(err => {
+      console.log('Service Worker 注册失败:', err);
+    });
+  }
+  
   // 启动主动消息检查（每5分钟检查一次）
   setInterval(checkAndSendProactiveMessage, 5 * 60 * 1000);
   // 页面加载后也检查一次
@@ -1662,7 +1737,7 @@ function checkAndSendProactiveMessage() {
   const timeSinceLastProactive = (now - lastProactiveTime) / (1000 * 60 * 60);
   if (timeSinceLastProactive < 2) return;
   
-  const todaySchedules = getTodaySchedule();
+  const todaySchedules = getTodaySchedules();
   const hasSchedule = todaySchedules && todaySchedules.length > 0;
   
   let shouldSend = false;
@@ -1734,6 +1809,57 @@ async function sendProactiveMessage(context) {
   } catch(e) {
     console.error("主动消息发送失败:", e);
   }
+}
+
+// 页面可见性检测 - 用户返回页面时立即处理积压消息
+let hiddenTime = null;
+let pendingReply = null;
+
+document.addEventListener("visibilitychange", function() {
+  if (document.hidden) {
+    // 页面隐藏，记录时间
+    hiddenTime = new Date();
+  } else {
+    // 页面显示，检查是否有待回复消息
+    if (hiddenTime && pendingReply) {
+      const awayMinutes = (new Date() - hiddenTime) / (1000 * 60);
+      // 如果离开超过1分钟且有未回复消息
+      if (awayMinutes > 1) {
+        // 显示"回来了"提示
+        toast("연준: 老婆回来了~");
+        // 处理积压回复
+        processPendingReply();
+      }
+    }
+    hiddenTime = null;
+  }
+});
+
+// 处理积压回复
+async function processPendingReply() {
+  if (!pendingReply) return;
+  
+  const status = checkScheduleStatus();
+  const timeText = getTime();
+  
+  // 构建回复
+  let context = "";
+  if (status.isBusy) {
+    context = `刚才在忙${status.event ? status.event.title : '行程'}，现在刚有空看消息`;
+  } else if (status.hasSchedule) {
+    context = "刚忙完，现在有空了";
+  } else {
+    context = "刚才没看手机，现在才看到";
+  }
+  
+  // 先发送解释消息
+  addMsg("received", `애기얌~ ${context}（宝贝~${context}）`);
+  await new Promise(r => setTimeout(r, 1000));
+  
+  // 再回复原来的消息
+  const text = pendingReply;
+  pendingReply = null;
+  await reply(text);
 }
 
 document.addEventListener("DOMContentLoaded", init);
