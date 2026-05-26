@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -184,6 +185,27 @@ body { font-family: 'Noto Sans KR', sans-serif; }
         <p style="font-size:11px;color:#999;margin-top:5px;">自定义AI的性格、语气、对你的称呼等</p>
       </div>
       
+      <div class="form-group">
+        <label>📅 연준行程</label>
+        <div id="schedule-list" style="max-height:200px;overflow-y:auto;margin-bottom:10px;background:#f5f5f5;padding:10px;border-radius:8px;">
+          <p style="color:#999;font-size:12px;">暂无行程，点击下方添加</p>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input type="date" id="schedule-date" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+          <input type="time" id="schedule-time" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;">
+        </div>
+        <input type="text" id="schedule-title" placeholder="行程名称（如：M COUNTDOWN直播）" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;margin-bottom:8px;font-size:13px;">
+        <select id="schedule-type" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;margin-bottom:8px;font-size:13px;">
+          <option value="放送">📺 放送</option>
+          <option value="录制">🎬 录制</option>
+          <option value="直播">📱 直播</option>
+          <option value="活动">🎉 活动</option>
+          <option value="演唱会">🎤 演唱会</option>
+        </select>
+        <button class="btn btn-yellow" onclick="addSchedule()" style="width:100%;">➕ 添加行程</button>
+        <p style="font-size:11px;color:#999;margin-top:5px;">添加行程后，연준이会主动提起今天的安排</p>
+      </div>
+      
       <button class="btn btn-yellow" onclick="saveSettings()" style="margin-top:10px;">保存设置</button>
       <button class="btn btn-red" onclick="clearAll()" style="margin-top:10px;">清除所有</button>
     </div>
@@ -208,6 +230,85 @@ body { font-family: 'Noto Sans KR', sans-serif; }
     </div>
   </div>
 </div>
+
+<!-- KKT风格实时通话界面 -->
+<div class="modal" id="call-modal" style="background:linear-gradient(180deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);z-index:500;">
+  <div style="width:100%;height:100%;display:flex;flex-direction:column;color:#fff;position:relative;">
+    <!-- 顶部状态栏 -->
+    <div style="padding:50px 20px 20px;text-align:center;">
+      <div id="call-name" style="font-size:22px;font-weight:600;margin-bottom:8px;">연준</div>
+      <div id="call-timer" style="font-size:14px;color:#888;">00:00</div>
+    </div>
+    
+    <!-- 中间大头像 -->
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;">
+      <div id="call-avatar" style="width:180px;height:180px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-size:80px;box-shadow:0 10px 40px rgba(102,126,234,0.4);animation:callPulse 2s ease-in-out infinite;">
+        🦊
+      </div>
+    </div>
+    
+    <!-- 语音识别状态 -->
+    <div id="call-status-area" style="text-align:center;padding:0 30px 30px;min-height:80px;">
+      <div id="voice-wave" style="display:none;justify-content:center;align-items:center;gap:4px;height:30px;margin-bottom:15px;">
+        <span style="width:4px;height:8px;background:#fee500;border-radius:2px;animation:callWave 0.6s ease-in-out infinite;"></span>
+        <span style="width:4px;height:15px;background:#fee500;border-radius:2px;animation:callWave 0.6s ease-in-out 0.1s infinite;"></span>
+        <span style="width:4px;height:22px;background:#fee500;border-radius:2px;animation:callWave 0.6s ease-in-out 0.2s infinite;"></span>
+        <span style="width:4px;height:18px;background:#fee500;border-radius:2px;animation:callWave 0.6s ease-in-out 0.3s infinite;"></span>
+        <span style="width:4px;height:12px;background:#fee500;border-radius:2px;animation:callWave 0.6s ease-in-out 0.4s infinite;"></span>
+      </div>
+      <div id="recognized-text" style="font-size:15px;color:#ccc;line-height:1.5;"></div>
+    </div>
+    
+    <!-- 底部控制按钮 -->
+    <div style="padding:0 40px 60px;">
+      <div style="display:flex;justify-content:space-around;align-items:center;">
+        <!-- 静音按钮 -->
+        <button onclick="toggleMute()" style="width:60px;height:60px;border-radius:50%;border:none;background:rgba(255,255,255,0.15);color:#fff;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(10px);">
+          🔊
+        </button>
+        
+        <!-- 按住说话按钮 -->
+        <button id="mic-btn" 
+          onmousedown="startRecording()" 
+          ontouchstart="startRecording()"
+          onmouseup="stopAndSend()"
+          ontouchend="stopAndSend()"
+          onmouseleave="cancelRecording()"
+          style="width:80px;height:80px;border-radius:50%;border:none;background:#fee500;font-size:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 5px 20px rgba(254,229,0,0.4);transition:all 0.2s;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;">
+          🎤
+        </button>
+        
+        <!-- 挂断按钮 -->
+        <button onclick="endCall()" style="width:60px;height:60px;border-radius:50%;border:none;background:#ff4444;color:#fff;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 5px 20px rgba(255,68,68,0.4);">
+          📞
+        </button>
+      </div>
+      
+      <!-- 提示文字 -->
+      <div id="call-hint" style="text-align:center;margin-top:20px;font-size:13px;color:#888;">
+        按住麦克风说话
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes callPulse {
+  0%,100% { transform:scale(1);box-shadow:0 10px 40px rgba(102,126,234,0.4); }
+  50% { transform:scale(1.02);box-shadow:0 15px 50px rgba(102,126,234,0.6); }
+}
+@keyframes callWave {
+  0%,100% { transform:scaleY(0.6); }
+  50% { transform:scaleY(1.2); }
+}
+#call-modal.show { display:flex !important; }
+#mic-btn.recording { 
+  background:#ff6b6b !important; 
+  transform:scale(0.95);
+  box-shadow:0 5px 20px rgba(255,107,107,0.5) !important;
+}
+#mic-btn:active { transform:scale(0.9); }
+</style>
 
 <div class="toast" id="toast"></div>
 
@@ -836,8 +937,245 @@ function goBack() {
   toast("返回功能开发中");
 }
 
+// ========== 实时通话功能 ==========
+let callTimer = null;
+let callSeconds = 0;
+let isRecording = false;
+let recognition = null;
+let isMuted = false;
+
+// 检查浏览器是否支持语音识别
+function checkSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  return !!SpeechRecognition;
+}
+
 function startCall() {
-  toast("通话功能开发中");
+  // 检查麦克风权限
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(() => {
+      document.getElementById("call-modal").classList.add("show");
+      document.getElementById("call-name").textContent = state.name;
+      startCallTimer();
+      
+      // 初始化语音识别
+      initSpeechRecognition();
+      
+      // 播放连接音效（可选）
+      toast("연준과 연결중...");
+      
+      // 3秒后AI主动打招呼
+      setTimeout(() => {
+        speakInCall("여보세요~ 애기얌?（喂~宝宝吗？）");
+      }, 2000);
+    })
+    .catch(err => {
+      toast("需要麦克风权限才能通话");
+      console.error("麦克风权限错误:", err);
+    });
+}
+
+function endCall() {
+  document.getElementById("call-modal").classList.remove("show");
+  stopCallTimer();
+  stopRecording();
+  
+  // 显示通话结束
+  const mins = Math.floor(callSeconds / 60);
+  const secs = callSeconds % 60;
+  toast(`通话结束 ${mins}:${secs.toString().padStart(2,'0')}`);
+  
+  callSeconds = 0;
+}
+
+function startCallTimer() {
+  callSeconds = 0;
+  updateCallTimer();
+  callTimer = setInterval(updateCallTimer, 1000);
+}
+
+function stopCallTimer() {
+  if (callTimer) {
+    clearInterval(callTimer);
+    callTimer = null;
+  }
+}
+
+function updateCallTimer() {
+  callSeconds++;
+  const mins = Math.floor(callSeconds / 60);
+  const secs = callSeconds % 60;
+  document.getElementById("call-timer").textContent = 
+    `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+}
+
+function toggleMute() {
+  isMuted = !isMuted;
+  event.target.textContent = isMuted ? "🔇" : "🔊";
+  toast(isMuted ? "已静音" : "已开启声音");
+}
+
+// 初始化语音识别
+function initSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    document.getElementById("call-hint").textContent = "您的浏览器不支持语音识别";
+    return;
+  }
+  
+  recognition = new SpeechRecognition();
+  recognition.lang = 'zh-CN'; // 中文识别
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  
+  recognition.onstart = () => {
+    document.getElementById("voice-wave").style.display = "flex";
+    document.getElementById("call-hint").textContent = "正在听...";
+  };
+  
+  recognition.onresult = (event) => {
+    let finalTranscript = '';
+    let interimTranscript = '';
+    
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        finalTranscript += transcript;
+      } else {
+        interimTranscript += transcript;
+      }
+    }
+    
+    const displayText = finalTranscript || interimTranscript;
+    document.getElementById("recognized-text").textContent = displayText;
+    
+    // 识别到完整句子后，发送给AI
+    if (finalTranscript && finalTranscript.trim()) {
+      handleVoiceInput(finalTranscript.trim());
+    }
+  };
+  
+  recognition.onerror = (event) => {
+    console.error("语音识别错误:", event.error);
+    document.getElementById("call-hint").textContent = "识别出错，请重试";
+  };
+  
+  recognition.onend = () => {
+    document.getElementById("voice-wave").style.display = "none";
+    if (isRecording) {
+      // 自动重新启动
+      try { recognition.start(); } catch(e) {}
+    }
+  };
+}
+
+function toggleRecording() {
+  const btn = document.getElementById("mic-btn");
+  
+  if (!recognition) {
+    toast("浏览器不支持语音识别");
+    return;
+  }
+  
+  if (isRecording) {
+    // 停止录音
+    isRecording = false;
+    btn.classList.remove("recording");
+    document.getElementById("call-hint").textContent = "按住麦克风说话";
+    try { recognition.stop(); } catch(e) {}
+  } else {
+    // 开始录音
+    isRecording = true;
+    btn.classList.add("recording");
+    document.getElementById("call-hint").textContent = "松开结束，或继续说话";
+    try { recognition.start(); } catch(e) {
+      // 可能已经在运行
+    }
+  }
+}
+
+function stopRecording() {
+  isRecording = false;
+  const btn = document.getElementById("mic-btn");
+  if (btn) btn.classList.remove("recording");
+  if (recognition) {
+    try { recognition.stop(); } catch(e) {}
+  }
+  document.getElementById("voice-wave").style.display = "none";
+}
+
+// 处理语音输入并获取AI回复
+async function handleVoiceInput(text) {
+  document.getElementById("recognized-text").textContent = text;
+  document.getElementById("call-hint").textContent = "연준 생각중...";
+  
+  try {
+    // 调用AI获取回复
+    const reply = await getAIReply(text);
+    
+    // 在通话界面显示回复
+    document.getElementById("call-hint").textContent = "연준: " + reply.substring(0, 30) + "...";
+    
+    // 语音播放回复
+    speakInCall(reply);
+    
+  } catch(err) {
+    console.error("AI回复错误:", err);
+    document.getElementById("call-hint").textContent = "网络错误，请重试";
+  }
+}
+
+// AI回复函数
+async function getAIReply(text) {
+  const messages = [
+    { role: "system", content: state.prompt || DP_BASE },
+    { role: "user", content: text }
+  ];
+  
+  const res = await fetch(CONFIG.dUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + CONFIG.dk
+    },
+    body: JSON.stringify({
+      model: "deepseek-chat",
+      messages: messages,
+      max_tokens: 200
+    })
+  });
+  
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
+// 语音合成播放（通话中使用）
+function speakInCall(text) {
+  // 提取韩语部分（如果有翻译格式）
+  let speakText = text;
+  if (text.includes('---') || text.includes('——')) {
+    const parts = text.split(/---|——/);
+    speakText = parts[0].trim(); // 只读韩语部分
+  }
+  
+  // 使用浏览器内置TTS
+  if ('speechSynthesis' in window && !isMuted) {
+    // 取消之前的语音
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(speakText);
+    utterance.lang = 'ko-KR'; // 韩语
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    
+    // 尝试找韩语男声
+    const voices = window.speechSynthesis.getVoices();
+    const koVoice = voices.find(v => v.lang.includes('ko') && v.name.includes('Male'))
+                 || voices.find(v => v.lang.includes('ko'));
+    if (koVoice) utterance.voice = koVoice;
+    
+    window.speechSynthesis.speak(utterance);
+  }
 }
 
 function openSettings() {
@@ -869,6 +1207,13 @@ function openSettings() {
     if (c.dataset.color === state.bgColor) c.classList.add("active");
   });
   selColor = state.bgColor;
+  
+  // 加载行程列表
+  loadSchedules();
+  // 设置日期默认值为今天
+  const today = new Date().toISOString().split('T')[0];
+  const dateInput = document.getElementById("schedule-date");
+  if (dateInput) dateInput.value = today;
 }
 
 function closeSettings() {
@@ -951,6 +1296,94 @@ function applyTheme() {
   header.style.color = isDark ? "#fff" : "#333";
 }
 
+// ========== 行程管理 ==========
+let schedules = [];
+
+function loadSchedules() {
+  try {
+    const data = localStorage.getItem("yj_schedules");
+    if (data) {
+      schedules = JSON.parse(data);
+    }
+  } catch(e) {
+    schedules = [];
+  }
+  renderScheduleList();
+}
+
+function saveSchedules() {
+  localStorage.setItem("yj_schedules", JSON.stringify(schedules));
+  renderScheduleList();
+}
+
+function renderScheduleList() {
+  const listEl = document.getElementById("schedule-list");
+  if (!listEl) return;
+  
+  if (schedules.length === 0) {
+    listEl.innerHTML = '<p style="color:#999;font-size:12px;">暂无行程，点击下方添加</p>';
+    return;
+  }
+  
+  // 按日期排序
+  const sorted = [...schedules].sort((a, b) => new Date(a.date) - new Date(b.date));
+  
+  let html = '';
+  sorted.forEach((sch, idx) => {
+    const dateStr = sch.date;
+    const timeStr = sch.time || '全天';
+    html += `
+      <div style="background:#fff;padding:10px;border-radius:6px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-weight:600;font-size:13px;color:#333;">${sch.title}</div>
+          <div style="font-size:11px;color:#666;margin-top:3px;">${dateStr} ${timeStr} · ${sch.type}</div>
+        </div>
+        <button onclick="deleteSchedule(${idx})" style="background:#ffebee;color:#c62828;border:none;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer;">删除</button>
+      </div>
+    `;
+  });
+  listEl.innerHTML = html;
+}
+
+function addSchedule() {
+  const date = document.getElementById("schedule-date").value;
+  const time = document.getElementById("schedule-time").value;
+  const title = document.getElementById("schedule-title").value.trim();
+  const type = document.getElementById("schedule-type").value;
+  
+  if (!date || !title) {
+    toast("请填写日期和行程名称");
+    return;
+  }
+  
+  schedules.push({
+    id: Date.now(),
+    date: date,
+    time: time || "全天",
+    title: title,
+    type: type
+  });
+  
+  saveSchedules();
+  
+  // 清空输入
+  document.getElementById("schedule-title").value = "";
+  toast("✓ 行程已添加");
+}
+
+function deleteSchedule(idx) {
+  if (confirm("确定删除这个行程吗？")) {
+    schedules.splice(idx, 1);
+    saveSchedules();
+    toast("✓ 已删除");
+  }
+}
+
+function getTodaySchedule() {
+  const today = new Date().toISOString().split('T')[0];
+  return schedules.filter(s => s.date === today);
+}
+
 function saveSettings() {
   try {
     // 获取表单值
@@ -980,6 +1413,9 @@ function saveSettings() {
     };
     
     localStorage.setItem("yj_state", JSON.stringify(saveData));
+    
+    // 同时保存行程数据
+    saveSchedules();
     
     document.getElementById("name").textContent = state.name;
     applyTheme();
@@ -1158,6 +1594,41 @@ function init() {
     const m = localStorage.getItem("yj_memory");
     if (m) state.memory = m;
   } catch(e) {}
+  
+  // 加载行程数据
+  try {
+    const sch = localStorage.getItem("yj_schedules");
+    if (sch) {
+      schedules = JSON.parse(sch);
+    } else {
+      // 首次使用，添加今天的预置行程
+      schedules = [
+        {
+          id: 1,
+          date: "2026-05-26",
+          time: "全天",
+          title: "PPULBATU <Hey! APPUL Market> POP-UP",
+          type: "活动"
+        },
+        {
+          id: 2,
+          date: "2026-05-26",
+          time: "22:10",
+          title: "tvN《Kill It》播出",
+          type: "放送"
+        },
+        {
+          id: 3,
+          date: "2026-05-27",
+          time: "18:00",
+          title: "TXT MOA CON - 千叶 Day 1",
+          type: "演唱会"
+        }
+      ];
+      localStorage.setItem("yj_schedules", JSON.stringify(schedules));
+    }
+  } catch(e) {}
+  
   renderStickers();
   document.getElementById("name").textContent = state.name;
   updateDate();
@@ -1191,8 +1662,8 @@ function checkAndSendProactiveMessage() {
   const timeSinceLastProactive = (now - lastProactiveTime) / (1000 * 60 * 60);
   if (timeSinceLastProactive < 2) return;
   
-  const schedule = getTodaySchedule();
-  const hasSchedule = schedule && schedule.events && schedule.events.length > 0;
+  const todaySchedules = getTodaySchedule();
+  const hasSchedule = todaySchedules && todaySchedules.length > 0;
   
   let shouldSend = false;
   let context = "";
@@ -1200,7 +1671,12 @@ function checkAndSendProactiveMessage() {
   // 早起场景 (6-8点)
   if (hour >= 6 && hour < 8) {
     shouldSend = true;
-    context = hasSchedule ? "早上好，今天有行程" : "早上好，今天没有行程";
+    if (hasSchedule) {
+      const titles = todaySchedules.map(s => s.title).join("、");
+      context = `早上好，今天有行程：${titles}`;
+    } else {
+      context = "早上好，今天没有行程";
+    }
   }
   // 晚睡场景 (23-1点)
   else if (hour >= 23 || hour < 1) {
@@ -1209,7 +1685,7 @@ function checkAndSendProactiveMessage() {
   }
   // 行程前1小时
   else if (hasSchedule) {
-    for (const event of schedule.events) {
+    for (const event of todaySchedules) {
       if (event.time && event.time.includes(':')) {
         const [h, m] = event.time.split(':').map(Number);
         const eventHour = h;
