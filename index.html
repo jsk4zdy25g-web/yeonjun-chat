@@ -1661,39 +1661,60 @@ function init() {
     if (m) state.memory = m;
   } catch(e) {}
   
-  // 加载行程数据
+  // 加载行程数据 - 强制更新今天的行程
   try {
+    // 获取现有数据
     const sch = localStorage.getItem("yj_schedules");
+    let existingSchedules = [];
     if (sch) {
-      schedules = JSON.parse(sch);
-    } else {
-      // 首次使用，添加今天的预置行程
-      schedules = [
-        {
-          id: 1,
-          date: "2026-05-26",
-          time: "全天",
-          title: "PPULBATU <Hey! APPUL Market> POP-UP",
-          type: "活动"
-        },
-        {
-          id: 2,
-          date: "2026-05-26",
-          time: "22:10",
-          title: "tvN《Kill It》播出",
-          type: "放送"
-        },
-        {
-          id: 3,
-          date: "2026-05-27",
-          time: "18:00",
-          title: "TXT MOA CON - 千叶 Day 1",
-          type: "演唱会"
+      try {
+        existingSchedules = JSON.parse(sch);
+        // 如果是旧格式（带events的对象），转换
+        if (!Array.isArray(existingSchedules)) {
+          existingSchedules = [];
         }
-      ];
-      localStorage.setItem("yj_schedules", JSON.stringify(schedules));
+      } catch(e) {
+        existingSchedules = [];
+      }
     }
-  } catch(e) {}
+    
+    // 删除今天的旧数据
+    const today = new Date().toISOString().split('T')[0];
+    existingSchedules = existingSchedules.filter(s => s.date !== today);
+    
+    // 添加今天的行程
+    const todaySchedules = [
+      {
+        id: Date.now(),
+        date: "2026-05-26",
+        time: "全天",
+        title: "PPULBATU <Hey! APPUL Market> POP-UP",
+        type: "活动"
+      },
+      {
+        id: Date.now() + 1,
+        date: "2026-05-26",
+        time: "22:10",
+        title: "tvN《Kill It》播出",
+        type: "放送"
+      },
+      {
+        id: Date.now() + 2,
+        date: "2026-05-27",
+        time: "18:00",
+        title: "TXT MOA CON - 千叶 Day 1",
+        type: "演唱会"
+      }
+    ];
+    
+    schedules = [...existingSchedules.filter(s => s.date !== "2026-05-26" && s.date !== "2026-05-27"), ...todaySchedules];
+    localStorage.setItem("yj_schedules", JSON.stringify(schedules));
+    
+    console.log("今日行程已更新:", schedules);
+  } catch(e) {
+    console.error("行程加载失败:", e);
+    schedules = [];
+  }
   
   renderStickers();
   document.getElementById("name").textContent = state.name;
